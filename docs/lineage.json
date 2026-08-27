@@ -1,15 +1,18 @@
 {
   "counts": {
     "models": 9,
-    "tests": 33
+    "tests": 41
   },
   "models": [
     {
-      "columns": [],
+      "columns": [
+        "date_day",
+        "date_key"
+      ],
       "depends_on": [
         "stg_orders"
       ],
-      "description": "",
+      "description": "Grain: one row per calendar date. Range is derived from the order data and padded to whole years, so partial-year edges show as low counts rather than as absent rows -- a date dimension that stops before the facts do silently drops them on an inner join.",
       "materialized": "table",
       "name": "dim_dates",
       "path": "models/marts/dim_dates.sql",
@@ -17,11 +20,15 @@
       "sources": []
     },
     {
-      "columns": [],
+      "columns": [
+        "customer_id",
+        "order_id",
+        "order_status"
+      ],
       "depends_on": [
         "stg_orders"
       ],
-      "description": "",
+      "description": "Grain: one row per order. Carries the order lifecycle and its derived delivery measures; additive money measures live in fct_order_items. is_on_time and delivery_days are NULL rather than false/zero where an order has no delivery timestamp, so ~3,000 undelivered orders are excluded from those metrics rather than silently counted as late.",
       "materialized": "table",
       "name": "fct_orders",
       "path": "models/marts/fct_orders.sql",
@@ -34,7 +41,7 @@
         "product_category_name_en"
       ],
       "depends_on": [],
-      "description": "The source's own reference table, and it is incomplete -- 2 categories in stg_products have no row here.",
+      "description": "Grain: one row per Portuguese category name. 71 rows. This is the source's own governed reference table, and it is incomplete -- 2 categories in stg_products have no row here, covering 0.04% of revenue.",
       "materialized": "view",
       "name": "stg_category_translation",
       "path": "models/staging/stg_category_translation.sql",
@@ -144,6 +151,14 @@
   "tests": [
     {
       "dq_dimension": "validity",
+      "name": "accepted_values_fct_orders_order_status__delivered__shipped__canceled__unavailable__invoiced__processing__created__approved",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_orders"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
       "name": "accepted_values_stg_orders_order_status__delivered__shipped__canceled__unavailable__invoiced__processing__created__approved",
       "severity": "ERROR",
       "tests_models": [
@@ -220,6 +235,30 @@
       "severity": "ERROR",
       "tests_models": [
         "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_dim_dates_date_day",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_dates"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_fct_orders_customer_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_orders"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_fct_orders_order_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_orders"
       ]
     },
     {
@@ -320,6 +359,15 @@
     },
     {
       "dq_dimension": "consistency",
+      "name": "relationships_fct_orders_customer_id__customer_id__ref_stg_customers_",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_orders",
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
       "name": "relationships_stg_order_items_order_id__order_id__ref_stg_orders_",
       "severity": "ERROR",
       "tests_models": [
@@ -361,6 +409,30 @@
       "tests_models": [
         "stg_orders",
         "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_dim_dates_date_day",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_dates"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_dim_dates_date_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_dates"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_fct_orders_order_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_orders"
       ]
     },
     {

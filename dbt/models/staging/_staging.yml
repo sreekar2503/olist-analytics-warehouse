@@ -123,8 +123,9 @@ models:
 
   - name: stg_category_translation
     description: >
-      The source's own reference table, and it is incomplete -- 2 categories in
-      stg_products have no row here.
+      Grain: one row per Portuguese category name. 71 rows. This is the source's
+      own governed reference table, and it is incomplete -- 2 categories in
+      stg_products have no row here, covering 0.04% of revenue.
     columns:
       - name: product_category_name
         data_tests:

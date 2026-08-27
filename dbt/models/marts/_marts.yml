@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: dim_dates
+    description: >
+      Grain: one row per calendar date. Range is derived from the order data and
+      padded to whole years, so partial-year edges show as low counts rather
+      than as absent rows -- a date dimension that stops before the facts do
+      silently drops them on an inner join.
+    columns:
+      - name: date_day
+        description: "The date itself. Primary key."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: date_key
+        description: "Integer surrogate in YYYYMMDD form."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+
+  - name: fct_orders
+    description: >
+      Grain: one row per order. Carries the order lifecycle and its derived
+      delivery measures; additive money measures live in fct_order_items.
+      is_on_time and delivery_days are NULL rather than false/zero where an
+      order has no delivery timestamp, so ~3,000 undelivered orders are excluded
+      from those metrics rather than silently counted as late.
+    columns:
+      - name: order_id
+        description: "Degenerate dimension. Primary key."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: customer_id
+        description: >
+          Issued per order, not per person. Do NOT treat as a customer key --
+          see stg_customers.
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+              config:
+                meta: {dq_dimension: consistency}
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [delivered, shipped, canceled, unavailable,
+                         invoiced, processing, created, approved]
+              config:
+                meta: {dq_dimension: validity}
