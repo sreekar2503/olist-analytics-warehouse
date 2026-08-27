@@ -1,7 +1,7 @@
 {
   "counts": {
-    "models": 3,
-    "tests": 2
+    "models": 9,
+    "tests": 33
   },
   "models": [
     {
@@ -30,7 +30,59 @@
     },
     {
       "columns": [
-        "order_id"
+        "product_category_name",
+        "product_category_name_en"
+      ],
+      "depends_on": [],
+      "description": "The source's own reference table, and it is incomplete -- 2 categories in stg_products have no row here.",
+      "materialized": "view",
+      "name": "stg_category_translation",
+      "path": "models/staging/stg_category_translation.sql",
+      "schema": "main_staging",
+      "sources": [
+        "product_category_name_translation"
+      ]
+    },
+    {
+      "columns": [
+        "customer_id",
+        "customer_state",
+        "customer_unique_id"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per customer_id. customer_id is issued per order, not per person -- 99,441 of them map to 96,096 customer_unique_id values.",
+      "materialized": "view",
+      "name": "stg_customers",
+      "path": "models/staging/stg_customers.sql",
+      "schema": "main_staging",
+      "sources": [
+        "customers"
+      ]
+    },
+    {
+      "columns": [
+        "freight_brl",
+        "item_price_brl",
+        "order_id",
+        "order_item_key",
+        "product_id",
+        "seller_id"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per order line. Covers 98,666 of 99,441 orders -- 775 orders have no item rows.",
+      "materialized": "view",
+      "name": "stg_order_items",
+      "path": "models/staging/stg_order_items.sql",
+      "schema": "main_staging",
+      "sources": [
+        "order_items"
+      ]
+    },
+    {
+      "columns": [
+        "customer_id",
+        "order_id",
+        "order_status"
       ],
       "depends_on": [],
       "description": "Grain: one row per order.",
@@ -41,9 +93,191 @@
       "sources": [
         "orders"
       ]
+    },
+    {
+      "columns": [
+        "order_id",
+        "payment_brl",
+        "payment_type"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per (order_id, payment_sequential). Not one row per order -- an order may be paid with several instruments.",
+      "materialized": "view",
+      "name": "stg_payments",
+      "path": "models/staging/stg_payments.sql",
+      "schema": "main_staging",
+      "sources": [
+        "order_payments"
+      ]
+    },
+    {
+      "columns": [
+        "product_id",
+        "product_weight_g"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per product. 610 rows carry no category and no descriptive attributes at all; they are kept, not filtered, and labelled in the mart.",
+      "materialized": "view",
+      "name": "stg_products",
+      "path": "models/staging/stg_products.sql",
+      "schema": "main_staging",
+      "sources": [
+        "products"
+      ]
+    },
+    {
+      "columns": [
+        "seller_id",
+        "seller_state"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per seller.",
+      "materialized": "view",
+      "name": "stg_sellers",
+      "path": "models/staging/stg_sellers.sql",
+      "schema": "main_staging",
+      "sources": [
+        "sellers"
+      ]
     }
   ],
   "tests": [
+    {
+      "dq_dimension": "validity",
+      "name": "accepted_values_stg_orders_order_status__delivered__shipped__canceled__unavailable__invoiced__processing__created__approved",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_orders"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
+      "name": "accepted_values_stg_payments_payment_type__credit_card__boleto__voucher__debit_card__not_defined",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_accepted_range_stg_order_items_freight_brl__True__0",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_accepted_range_stg_order_items_item_price_brl__False__0",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_accepted_range_stg_payments_payment_brl__True__0",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_accepted_range_stg_products_product_weight_g__False__0",
+      "severity": "warn",
+      "tests_models": [
+        "stg_products"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
+      "name": "dbt_utils_expression_is_true_stg_customers_length_customer_state_2",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
+      "name": "dbt_utils_expression_is_true_stg_customers_length_customer_zip_prefix_5",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
+      "name": "dbt_utils_expression_is_true_stg_sellers_length_seller_zip_prefix_5",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_sellers"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "dbt_utils_unique_combination_of_columns_stg_payments_order_id__payment_sequence_number",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_category_translation_product_category_name",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_category_translation"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_category_translation_product_category_name_en",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_category_translation"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_customers_customer_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_customers_customer_state",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_customers_customer_unique_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_order_items_order_item_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_orders_customer_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_orders"
+      ]
+    },
     {
       "dq_dimension": "completeness",
       "name": "not_null_stg_orders_order_id",
@@ -53,11 +287,128 @@
       ]
     },
     {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_payments_order_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_products_product_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_products"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_sellers_seller_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_sellers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_sellers_seller_state",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_sellers"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_stg_order_items_order_id__order_id__ref_stg_orders_",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items",
+        "stg_orders"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_stg_order_items_product_id__product_id__ref_stg_products_",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items",
+        "stg_products"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_stg_order_items_seller_id__seller_id__ref_stg_sellers_",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items",
+        "stg_sellers"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_stg_orders_customer_id__customer_id__ref_stg_customers_",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers",
+        "stg_orders"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_stg_payments_order_id__order_id__ref_stg_orders_",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_orders",
+        "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_category_translation_product_category_name",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_category_translation"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_customers_customer_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_order_items_order_item_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_order_items"
+      ]
+    },
+    {
       "dq_dimension": "uniqueness",
       "name": "unique_stg_orders_order_id",
       "severity": "ERROR",
       "tests_models": [
         "stg_orders"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_products_product_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_products"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_sellers_seller_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_sellers"
       ]
     }
   ]

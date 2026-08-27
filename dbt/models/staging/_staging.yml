@@ -13,3 +13,226 @@ models:
           - not_null:
               config:
                 meta: {dq_dimension: completeness}
+      - name: order_status
+        description: "Order lifecycle state as shipped by the source."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [delivered, shipped, canceled, unavailable,
+                         invoiced, processing, created, approved]
+              config:
+                meta: {dq_dimension: validity}
+      - name: customer_id
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+              config:
+                meta: {dq_dimension: consistency}
+
+  - name: stg_customers
+    description: >
+      Grain: one row per customer_id. customer_id is issued per order, not per
+      person -- 99,441 of them map to 96,096 customer_unique_id values.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "length(customer_state) = 2"
+          config:
+            meta: {dq_dimension: validity}
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "length(customer_zip_prefix) = 5"
+          config:
+            meta: {dq_dimension: validity}
+    columns:
+      - name: customer_id
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: customer_unique_id
+        description: "The actual person. Deliberately NOT unique here."
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: customer_state
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+
+  - name: stg_sellers
+    description: "Grain: one row per seller."
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "length(seller_zip_prefix) = 5"
+          config:
+            meta: {dq_dimension: validity}
+    columns:
+      - name: seller_id
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: seller_state
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+
+  - name: stg_products
+    description: >
+      Grain: one row per product. 610 rows carry no category and no descriptive
+      attributes at all; they are kept, not filtered, and labelled in the mart.
+    columns:
+      - name: product_id
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: product_weight_g
+        description: >
+          4 products weigh 0g -- physically impossible. Configured to warn, not
+          error: it is a real defect in the source that this project did not
+          cause, and a scorecard that reports it is more useful than a build
+          that refuses to run because of it.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+              config:
+                severity: warn
+                meta: {dq_dimension: accuracy}
+
+  - name: stg_category_translation
+    description: >
+      The source's own reference table, and it is incomplete -- 2 categories in
+      stg_products have no row here.
+    columns:
+      - name: product_category_name
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: product_category_name_en
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+
+  - name: stg_order_items
+    description: >
+      Grain: one row per order line. Covers 98,666 of 99,441 orders -- 775
+      orders have no item rows.
+    columns:
+      - name: order_item_key
+        description: "Surrogate over (order_id, order_line_number)."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+              config:
+                meta: {dq_dimension: consistency}
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+              config:
+                meta: {dq_dimension: consistency}
+      - name: seller_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_sellers')
+                field: seller_id
+              config:
+                meta: {dq_dimension: consistency}
+      - name: item_price_brl
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+              config:
+                meta: {dq_dimension: accuracy}
+      - name: freight_brl
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+              config:
+                meta: {dq_dimension: accuracy}
+
+  - name: stg_payments
+    description: >
+      Grain: one row per (order_id, payment_sequential). Not one row per order --
+      an order may be paid with several instruments.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, payment_sequence_number]
+          config:
+            meta: {dq_dimension: uniqueness}
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+              config:
+                meta: {dq_dimension: consistency}
+      - name: payment_type
+        description: >
+          'not_defined' appears on 3 rows and is a NULL encoded as a string. It
+          is listed as an accepted value so the test documents reality; a NEW
+          undocumented value is what should fail here.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [credit_card, boleto, voucher, debit_card, not_defined]
+              config:
+                meta: {dq_dimension: validity}
+      - name: payment_brl
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+              config:
+                meta: {dq_dimension: accuracy}
