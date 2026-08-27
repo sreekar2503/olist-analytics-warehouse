@@ -1,0 +1,7 @@
+dimension,tests,passed,failing_rows,pass_rate
+completeness,1,1,0,1.0
+validity,0,0,0,
+accuracy,0,0,0,
+consistency,0,0,0,
+timeliness,0,0,0,
+uniqueness,1,1,0,1.0

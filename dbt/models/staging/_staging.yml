@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Grain: one row per order."
+    columns:
+      - name: order_id
+        description: "Natural key. Verified unique across all 99,441 rows."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}

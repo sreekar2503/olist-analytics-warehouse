@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Always runs. Needs no data, so gitignoring the CC BY-NC-SA dataset cannot
+  # turn CI permanently red -- the same job split used in project 1.
+  validate:
+    name: Validate (no data required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Install dbt packages
+        working-directory: dbt
+        run: dbt deps --profiles-dir .
+      - name: Parse the project (catches broken refs and bad YAML)
+        working-directory: dbt
+        run: dbt parse --profiles-dir .
+      - name: Unit tests
+        run: pytest tests/ -v
+
+  # Runs the real warehouse. Gated on a Kaggle token being configured, because
+  # the dataset is CC BY-NC-SA 4.0 and is not redistributed from this repo.
+  warehouse:
+    name: Build warehouse and check generated artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt kaggle
+
+      - name: Check for Kaggle credentials
+        id: creds
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          if [ -n "$KAGGLE_API_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::KAGGLE_API_TOKEN not set; skipping the warehouse build."
+          fi
+
+      - name: Download dataset
+        if: steps.creds.outputs.available == 'true'
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: kaggle datasets download -d olistbr/brazilian-ecommerce -p data/raw --unzip
+
+      - name: Load raw
+        if: steps.creds.outputs.available == 'true'
+        run: python scripts/load_raw.py
+
+      - name: dbt deps
+        if: steps.creds.outputs.available == 'true'
+        working-directory: dbt
+        run: dbt deps --profiles-dir .
+
+      - name: dbt build
+        if: steps.creds.outputs.available == 'true'
+        working-directory: dbt
+        run: dbt build --profiles-dir .
+
+      - name: Regenerate the published artifacts
+        if: steps.creds.outputs.available == 'true'
+        run: |
+          python scripts/profile_raw.py
+          python scripts/dq_scorecard.py
+          python scripts/export_lineage.py
+
+      - name: Docs and lineage still match what is committed
+        if: steps.creds.outputs.available == 'true'
+        # `git diff --exit-code`, NOT `git diff --stat`. --stat prints the
+        # difference and exits 0 either way, so a check written that way can
+        # never fail. That exact defect shipped in project 1's CI and is the
+        # reason this comment exists.
+        run: |
+          git diff --exit-code -- docs/dq_scorecard.csv docs/lineage.json docs/profile_raw.md
+
+      - name: dbt docs
+        if: steps.creds.outputs.available == 'true'
+        working-directory: dbt
+        run: dbt docs generate --profiles-dir .

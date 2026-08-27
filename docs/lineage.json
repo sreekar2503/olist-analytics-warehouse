@@ -1,0 +1,64 @@
+{
+  "counts": {
+    "models": 3,
+    "tests": 2
+  },
+  "models": [
+    {
+      "columns": [],
+      "depends_on": [
+        "stg_orders"
+      ],
+      "description": "",
+      "materialized": "table",
+      "name": "dim_dates",
+      "path": "models/marts/dim_dates.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
+    {
+      "columns": [],
+      "depends_on": [
+        "stg_orders"
+      ],
+      "description": "",
+      "materialized": "table",
+      "name": "fct_orders",
+      "path": "models/marts/fct_orders.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
+    {
+      "columns": [
+        "order_id"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per order.",
+      "materialized": "view",
+      "name": "stg_orders",
+      "path": "models/staging/stg_orders.sql",
+      "schema": "main_staging",
+      "sources": [
+        "orders"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_orders_order_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_orders"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_orders_order_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_orders"
+      ]
+    }
+  ]
+}

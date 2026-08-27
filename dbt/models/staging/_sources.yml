@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: >
+      Olist Brazilian e-commerce, loaded verbatim from Kaggle CSVs by
+      scripts/load_raw.py. Every column is VARCHAR: typing happens in staging so
+      that each cast is explicit and reviewable, rather than inferred at load
+      where a failed parse becomes a silent NULL. Column names are preserved
+      as-shipped, including the misspellings `product_name_lenght` and
+      `product_description_lenght`. Corrections happen in staging, never here.
+    tables:
+      - name: orders
+      - name: order_items
+      - name: customers
+      - name: products
+      - name: sellers
+      - name: order_reviews
+      - name: order_payments
+      - name: geolocation
+      - name: product_category_name_translation

@@ -1,0 +1,9 @@
+# Path is relative to this file's directory (dbt/), so the database lands in
+# ../data/olist.duckdb — gitignored, per LICENSE-DATA.md.
+olist:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/olist.duckdb
+      threads: 4
