@@ -237,3 +237,84 @@ models:
                 inclusive: true
               config:
                 meta: {dq_dimension: accuracy}
+
+  - name: stg_reviews
+    description: >
+      Grain: one row per (review_id, order_id). review_id alone is NOT unique --
+      789 reviews are attached to more than one order -- so joining on it fans
+      out. Verified: 99,224 rows, 99,224 distinct pairs.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [review_id, order_id]
+          config:
+            meta: {dq_dimension: uniqueness}
+    columns:
+      - name: review_order_key
+        description: "Surrogate over (review_id, order_id). Use this, not review_id."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+              config:
+                meta: {dq_dimension: consistency}
+      - name: review_score
+        description: "Integer 1-5, no nulls in the source."
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+              config:
+                meta: {dq_dimension: validity}
+
+  - name: stg_geolocation
+    description: >
+      Grain: one row per zip code prefix, reduced from 1,000,163 raw points by
+      median latitude/longitude after excluding coordinates outside Brazil. The
+      median is deliberate -- within-prefix spread reaches ~8,550km, so a mean
+      would be dragged off the map by a handful of bad points. The bounding box
+      includes Brazil's oceanic islands; the mainland-only version silently
+      deleted Fernando de Noronha.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "latitude between -34.0 and 5.3"
+          config:
+            meta: {dq_dimension: accuracy}
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "longitude between -74.0 and -28.8"
+          config:
+            meta: {dq_dimension: accuracy}
+    columns:
+      - name: zip_prefix
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: latitude
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: longitude
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}

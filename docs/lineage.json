@@ -1,7 +1,7 @@
 {
   "counts": {
-    "models": 9,
-    "tests": 41
+    "models": 11,
+    "tests": 53
   },
   "models": [
     {
@@ -64,6 +64,22 @@
       "schema": "main_staging",
       "sources": [
         "customers"
+      ]
+    },
+    {
+      "columns": [
+        "latitude",
+        "longitude",
+        "zip_prefix"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per zip code prefix, reduced from 1,000,163 raw points by median latitude/longitude after excluding coordinates outside Brazil. The median is deliberate -- within-prefix spread reaches ~8,550km, so a mean would be dragged off the map by a handful of bad points. The bounding box includes Brazil's oceanic islands; the mainland-only version silently deleted Fernando de Noronha.",
+      "materialized": "view",
+      "name": "stg_geolocation",
+      "path": "models/staging/stg_geolocation.sql",
+      "schema": "main_staging",
+      "sources": [
+        "geolocation"
       ]
     },
     {
@@ -134,6 +150,22 @@
     },
     {
       "columns": [
+        "order_id",
+        "review_order_key",
+        "review_score"
+      ],
+      "depends_on": [],
+      "description": "Grain: one row per (review_id, order_id). review_id alone is NOT unique -- 789 reviews are attached to more than one order -- so joining on it fans out. Verified: 99,224 rows, 99,224 distinct pairs.",
+      "materialized": "view",
+      "name": "stg_reviews",
+      "path": "models/staging/stg_reviews.sql",
+      "schema": "main_staging",
+      "sources": [
+        "order_reviews"
+      ]
+    },
+    {
+      "columns": [
         "seller_id",
         "seller_state"
       ],
@@ -171,6 +203,14 @@
       "severity": "ERROR",
       "tests_models": [
         "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
+      "name": "accepted_values_stg_reviews_review_score__False__1__2__3__4__5",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_reviews"
       ]
     },
     {
@@ -222,6 +262,22 @@
       ]
     },
     {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_expression_is_true_stg_geolocation_latitude_between_34_0_and_5_3",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_geolocation"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_expression_is_true_stg_geolocation_longitude_between_74_0_and_28_8",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_geolocation"
+      ]
+    },
+    {
       "dq_dimension": "validity",
       "name": "dbt_utils_expression_is_true_stg_sellers_length_seller_zip_prefix_5",
       "severity": "ERROR",
@@ -235,6 +291,14 @@
       "severity": "ERROR",
       "tests_models": [
         "stg_payments"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "dbt_utils_unique_combination_of_columns_stg_reviews_review_id__order_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_reviews"
       ]
     },
     {
@@ -303,6 +367,30 @@
     },
     {
       "dq_dimension": "completeness",
+      "name": "not_null_stg_geolocation_latitude",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_geolocation"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_geolocation_longitude",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_geolocation"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_geolocation_zip_prefix",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_geolocation"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
       "name": "not_null_stg_order_items_order_item_key",
       "severity": "ERROR",
       "tests_models": [
@@ -339,6 +427,22 @@
       "severity": "ERROR",
       "tests_models": [
         "stg_products"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_reviews_review_order_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_reviews"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_stg_reviews_review_score",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_reviews"
       ]
     },
     {
@@ -412,6 +516,15 @@
       ]
     },
     {
+      "dq_dimension": "consistency",
+      "name": "relationships_stg_reviews_order_id__order_id__ref_stg_orders_",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_orders",
+        "stg_reviews"
+      ]
+    },
+    {
       "dq_dimension": "uniqueness",
       "name": "unique_dim_dates_date_day",
       "severity": "ERROR",
@@ -453,6 +566,14 @@
     },
     {
       "dq_dimension": "uniqueness",
+      "name": "unique_stg_geolocation_zip_prefix",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_geolocation"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
       "name": "unique_stg_order_items_order_item_key",
       "severity": "ERROR",
       "tests_models": [
@@ -473,6 +594,14 @@
       "severity": "ERROR",
       "tests_models": [
         "stg_products"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_stg_reviews_review_order_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "stg_reviews"
       ]
     },
     {
