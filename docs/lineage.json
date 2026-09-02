@@ -1,9 +1,26 @@
 {
   "counts": {
-    "models": 11,
-    "tests": 53
+    "models": 16,
+    "tests": 75
   },
   "models": [
+    {
+      "columns": [
+        "customer_key",
+        "customer_state",
+        "order_count"
+      ],
+      "depends_on": [
+        "stg_customers",
+        "stg_orders"
+      ],
+      "description": "Grain: one row per customer_unique_id, the actual person. NOT one row per customer_id, which the source issues per order. Type 1: holds the address from the most recent order. 2,997 customers ordered more than once.",
+      "materialized": "table",
+      "name": "dim_customers",
+      "path": "models/marts/dim_customers.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
     {
       "columns": [
         "date_day",
@@ -21,11 +38,80 @@
     },
     {
       "columns": [
+        "geography_key"
+      ],
+      "depends_on": [
+        "stg_geolocation"
+      ],
+      "description": "Grain: one row per zip code prefix. Median coordinates over the raw points; see stg_geolocation for why a mean would land in the ocean.",
+      "materialized": "table",
+      "name": "dim_geography",
+      "path": "models/marts/dim_geography.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
+    {
+      "columns": [
+        "category_label",
+        "category_status",
+        "product_key"
+      ],
+      "depends_on": [
+        "stg_category_translation",
+        "stg_products"
+      ],
+      "description": "Grain: one row per product. Nothing is filtered: 610 products with no category and 13 with no English translation are kept and labelled via category_status, so a category report shows what it is missing.",
+      "materialized": "table",
+      "name": "dim_products",
+      "path": "models/marts/dim_products.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
+    {
+      "columns": [
+        "seller_key"
+      ],
+      "depends_on": [
+        "stg_sellers"
+      ],
+      "description": "Grain: one row per seller. 3,095 rows.",
+      "materialized": "table",
+      "name": "dim_sellers",
+      "path": "models/marts/dim_sellers.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
+    {
+      "columns": [
+        "customer_key",
+        "item_price_brl",
+        "order_date",
+        "order_item_key",
+        "product_key",
+        "seller_key"
+      ],
+      "depends_on": [
+        "stg_customers",
+        "stg_order_items",
+        "stg_orders"
+      ],
+      "description": "Grain: one row per order line. The atomic fact; everything aggregates up from here. Covers 98,666 of 99,441 orders.",
+      "materialized": "table",
+      "name": "fct_order_items",
+      "path": "models/marts/fct_order_items.sql",
+      "schema": "main_marts",
+      "sources": []
+    },
+    {
+      "columns": [
         "customer_id",
+        "customer_key",
         "order_id",
         "order_status"
       ],
       "depends_on": [
+        "stg_customers",
+        "stg_order_items",
         "stg_orders"
       ],
       "description": "Grain: one row per order. Carries the order lifecycle and its derived delivery measures; additive money measures live in fct_order_items. is_on_time and delivery_days are NULL rather than false/zero where an order has no delivery timestamp, so ~3,000 undelivered orders are excluded from those metrics rather than silently counted as late.",
@@ -183,6 +269,14 @@
   "tests": [
     {
       "dq_dimension": "validity",
+      "name": "accepted_values_dim_products_category_status__translated__no_category_in_source__no_english_translation",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_products"
+      ]
+    },
+    {
+      "dq_dimension": "validity",
       "name": "accepted_values_fct_orders_order_status__delivered__shipped__canceled__unavailable__invoiced__processing__created__approved",
       "severity": "ERROR",
       "tests_models": [
@@ -211,6 +305,22 @@
       "severity": "ERROR",
       "tests_models": [
         "stg_reviews"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_accepted_range_dim_customers_order_count__True__1",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers"
+      ]
+    },
+    {
+      "dq_dimension": "accuracy",
+      "name": "dbt_utils_accepted_range_fct_order_items_item_price_brl__False__0",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_order_items"
       ]
     },
     {
@@ -303,6 +413,30 @@
     },
     {
       "dq_dimension": "completeness",
+      "name": "not_null_dim_customers_customer_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_dim_customers_customer_state",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_dim_customers_order_count",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
       "name": "not_null_dim_dates_date_day",
       "severity": "ERROR",
       "tests_models": [
@@ -311,7 +445,55 @@
     },
     {
       "dq_dimension": "completeness",
+      "name": "not_null_dim_geography_geography_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_geography"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_dim_products_category_label",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_products"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_dim_products_product_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_products"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_dim_sellers_seller_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_sellers"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_fct_order_items_order_item_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
       "name": "not_null_fct_orders_customer_id",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_orders"
+      ]
+    },
+    {
+      "dq_dimension": "completeness",
+      "name": "not_null_fct_orders_customer_key",
       "severity": "ERROR",
       "tests_models": [
         "fct_orders"
@@ -463,11 +645,56 @@
     },
     {
       "dq_dimension": "consistency",
+      "name": "relationships_fct_order_items_customer_key__customer_key__ref_dim_customers_",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers",
+        "fct_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_fct_order_items_order_date__date_day__ref_dim_dates_",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_dates",
+        "fct_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_fct_order_items_product_key__product_key__ref_dim_products_",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_products",
+        "fct_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_fct_order_items_seller_key__seller_key__ref_dim_sellers_",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_sellers",
+        "fct_order_items"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
       "name": "relationships_fct_orders_customer_id__customer_id__ref_stg_customers_",
       "severity": "ERROR",
       "tests_models": [
         "fct_orders",
         "stg_customers"
+      ]
+    },
+    {
+      "dq_dimension": "consistency",
+      "name": "relationships_fct_orders_customer_key__customer_key__ref_dim_customers_",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers",
+        "fct_orders"
       ]
     },
     {
@@ -526,6 +753,14 @@
     },
     {
       "dq_dimension": "uniqueness",
+      "name": "unique_dim_customers_customer_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_customers"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
       "name": "unique_dim_dates_date_day",
       "severity": "ERROR",
       "tests_models": [
@@ -538,6 +773,38 @@
       "severity": "ERROR",
       "tests_models": [
         "dim_dates"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_dim_geography_geography_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_geography"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_dim_products_product_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_products"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_dim_sellers_seller_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "dim_sellers"
+      ]
+    },
+    {
+      "dq_dimension": "uniqueness",
+      "name": "unique_fct_order_items_order_item_key",
+      "severity": "ERROR",
+      "tests_models": [
+        "fct_order_items"
       ]
     },
     {

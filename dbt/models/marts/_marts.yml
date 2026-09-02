@@ -63,3 +63,156 @@ models:
                          invoiced, processing, created, approved]
               config:
                 meta: {dq_dimension: validity}
+      - name: customer_key
+        description: "The person. Joins to dim_customers, not to a per-order row."
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+              config:
+                meta: {dq_dimension: consistency}
+
+  - name: dim_customers
+    description: >
+      Grain: one row per customer_unique_id, the actual person. NOT one row per
+      customer_id, which the source issues per order. Type 1: holds the address
+      from the most recent order. 2,997 customers ordered more than once.
+    columns:
+      - name: customer_key
+        description: "customer_unique_id. The person, not the order."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: order_count
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+              config:
+                meta: {dq_dimension: accuracy}
+      - name: customer_state
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+
+  - name: dim_products
+    description: >
+      Grain: one row per product. Nothing is filtered: 610 products with no
+      category and 13 with no English translation are kept and labelled via
+      category_status, so a category report shows what it is missing.
+    columns:
+      - name: product_key
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: category_label
+        description: "Never null, so nothing silently drops out of a GROUP BY."
+        data_tests:
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: category_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["translated", "no category in source", "no english translation"]
+              config:
+                meta: {dq_dimension: validity}
+
+  - name: dim_sellers
+    description: "Grain: one row per seller. 3,095 rows."
+    columns:
+      - name: seller_key
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+
+  - name: dim_geography
+    description: >
+      Grain: one row per zip code prefix. Median coordinates over the raw
+      points; see stg_geolocation for why a mean would land in the ocean.
+    columns:
+      - name: geography_key
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+
+  - name: fct_order_items
+    description: >
+      Grain: one row per order line. The atomic fact; everything aggregates up
+      from here. Covers 98,666 of 99,441 orders.
+    columns:
+      - name: order_item_key
+        description: "Surrogate over (order_id, order_line_number)."
+        data_tests:
+          - unique:
+              config:
+                meta: {dq_dimension: uniqueness}
+          - not_null:
+              config:
+                meta: {dq_dimension: completeness}
+      - name: product_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_key
+              config:
+                meta: {dq_dimension: consistency}
+      - name: seller_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_key
+              config:
+                meta: {dq_dimension: consistency}
+      - name: customer_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+              config:
+                meta: {dq_dimension: consistency}
+      - name: order_date
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_dates')
+                field: date_day
+              config:
+                meta: {dq_dimension: consistency}
+      - name: item_price_brl
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+              config:
+                meta: {dq_dimension: accuracy}

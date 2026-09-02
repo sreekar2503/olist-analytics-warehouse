@@ -1,7 +1,7 @@
 dimension,tests,passed,failing_rows,pass_rate
-completeness,20,20,0,1.0
-validity,7,7,0,1.0
-accuracy,6,5,4,0.833
-consistency,7,7,0,1.0
+completeness,29,29,0,1.0
+validity,8,8,0,1.0
+accuracy,8,7,4,0.875
+consistency,12,12,0,1.0
 timeliness,0,0,0,
-uniqueness,13,13,0,1.0
+uniqueness,18,18,0,1.0
