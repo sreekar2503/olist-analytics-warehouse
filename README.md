@@ -54,6 +54,24 @@ checked by CI.
 | [`docs/dq_scorecard.csv`](docs/dq_scorecard.csv) | `scripts/dq_scorecard.py` |
 | [`docs/lineage.json`](docs/lineage.json) | `scripts/export_lineage.py` |
 
+Figures quoted in model headers and in `docs/` are declared in
+[`docs/figures.yml`](docs/figures.yml) with the query that produces them.
+`scripts/check_figures.py` fails the build if a documented number no longer
+matches the warehouse, or if a file listed as citing it no longer does.
+
+## Which job enforces what
+
+CI runs two jobs, and they guarantee different things.
+
+| Job | Runs | Proves |
+|---|---|---|
+| `validate` | always | The project parses; 127 unit tests pass. Reads the **committed** artifacts, so it cannot detect a stale one. |
+| `warehouse` | needs `KAGGLE_API_TOKEN` | Downloads the data, rebuilds from scratch, regenerates every artifact and diffs it against what is committed. **Required on `main`** — the job fails rather than skipping if the secret is absent. |
+
+The distinction matters: the freshness guarantee comes from `warehouse` alone.
+On a fork without the secret it is skipped with a warning, and `validate` going
+green does not mean the artifacts are current.
+
 <!-- TODO(sreekar): sections still to write —
      - The finding (lead with it)
      - The four business questions and the dashboard

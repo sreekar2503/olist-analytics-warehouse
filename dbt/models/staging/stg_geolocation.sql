@@ -1,4 +1,6 @@
--- Grain: one row per zip code prefix. 1,000,163 raw rows collapse to 19,015.
+-- Grain: one row per zip code prefix. 1,000,163 raw rows collapse to 19,011.
+-- (The raw table holds 19,015 distinct prefixes; four are dropped entirely by
+-- the bounding box below because every one of their points is bad.)
 --
 -- THE TIE-BREAK, AND WHY IT IS A MEDIAN.
 --
@@ -34,7 +36,7 @@
 -- not guaranteed to be one of the observed points. For placing a prefix on a
 -- map at country scale that is fine; it would not be fine for routing.
 --
--- Coverage gap for the ledger: 157 customer zip prefixes and 7 seller zip
+-- Coverage gap for the ledger: 158 customer zip prefixes and 7 seller zip
 -- prefixes have no row in this table at all, so any map built on it silently
 -- drops those customers and sellers.
 

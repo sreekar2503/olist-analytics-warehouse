@@ -40,6 +40,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt kaggle
 
+      # A skipped job used to report green, which made this job's guarantee
+      # invisible rather than absent. That is the same class of defect as
+      # `git diff --stat` one level up: not a check that cannot fail, but a
+      # check that silently never runs. On main the secret is now required, so
+      # "verified by CI" in the README cannot quietly become false.
       - name: Check for Kaggle credentials
         id: creds
         env:
@@ -47,9 +52,14 @@ jobs:
         run: |
           if [ -n "$KAGGLE_API_TOKEN" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "::error::KAGGLE_API_TOKEN is not set. On main the warehouse"
+            echo "::error::build must actually run, otherwise the artifact"
+            echo "::error::freshness check is claimed but never executed."
+            exit 1
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::KAGGLE_API_TOKEN not set; skipping the warehouse build."
+            echo "::warning::KAGGLE_API_TOKEN not set; warehouse build skipped on this branch."
           fi
 
       - name: Download dataset
@@ -78,6 +88,10 @@ jobs:
           python scripts/profile_raw.py
           python scripts/dq_scorecard.py
           python scripts/export_lineage.py
+
+      - name: Documented figures still match the warehouse
+        if: steps.creds.outputs.available == 'true'
+        run: python scripts/check_figures.py
 
       - name: Docs and lineage still match what is committed
         if: steps.creds.outputs.available == 'true'

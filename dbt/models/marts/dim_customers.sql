@@ -1,8 +1,8 @@
 -- Grain: one row per customer_unique_id, the actual person.
 --
 -- NOT one row per customer_id. The source issues customer_id per order, so
--- keying on it would give 99,441 rows and make every buyer a first-time buyer,
--- erasing the 2,997 people who ordered more than once.
+-- keying on it would give 99,441 rows instead of 96,096 people, and make every
+-- buyer a first-time buyer, erasing the 2,997 who ordered more than once.
 --
 -- Type 1: the address held here is the one from the customer's most recent
 -- order. 250 customers (0.26%) moved between orders, and that history is not

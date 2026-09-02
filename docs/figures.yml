@@ -1,0 +1,156 @@
+# Every number quoted in a model header or in docs/ is declared here, with the
+# query that produces it and the files that cite it.
+#
+# scripts/check_figures.py runs after `dbt build` and fails if a claim no longer
+# matches the warehouse, or if a file that is supposed to cite a figure no
+# longer contains it. This is project 1's test_docs.py idea applied to a
+# warehouse: a project whose thesis is documentation bound to reality should not
+# have hand-typed figures in every model header with nothing checking them.
+#
+# The `-- 19,015 raw rows collapse to 19,011` error this file exists to prevent
+# was real: the staging header quoted the pre-filter count as its own output,
+# and went stale the moment the bounding box changed.
+
+version: 1
+
+figures:
+  - name: geolocation_output_prefixes
+    claim: 19011
+    sql: select count(*) from main_staging.stg_geolocation
+    cited_in:
+      - dbt/models/staging/stg_geolocation.sql
+      - dbt/models/marts/dim_geography.sql
+      - docs/grain.md
+
+  - name: geolocation_raw_prefixes
+    claim: 19015
+    sql: select count(distinct geolocation_zip_code_prefix) from raw.geolocation
+    cited_in:
+      - dbt/models/staging/stg_geolocation.sql
+
+  - name: customer_prefixes_without_geography
+    claim: 158
+    sql: >
+      select count(distinct c.customer_zip_prefix) from main_staging.stg_customers c
+      where not exists (select 1 from main_staging.stg_geolocation g
+                        where g.zip_prefix = c.customer_zip_prefix)
+    cited_in:
+      - dbt/models/staging/stg_geolocation.sql
+
+  - name: customer_rows_without_geography
+    claim: 279
+    sql: >
+      select count(*) from main_staging.stg_customers c
+      where not exists (select 1 from main_staging.stg_geolocation g
+                        where g.zip_prefix = c.customer_zip_prefix)
+    cited_in:
+      - docs/grain.md
+
+  - name: seller_prefixes_without_geography
+    claim: 7
+    sql: >
+      select count(distinct s.seller_zip_prefix) from main_staging.stg_sellers s
+      where not exists (select 1 from main_staging.stg_geolocation g
+                        where g.zip_prefix = s.seller_zip_prefix)
+    cited_in:
+      - dbt/models/staging/stg_geolocation.sql
+
+  - name: unique_customers
+    claim: 96096
+    sql: select count(*) from main_marts.dim_customers
+    cited_in:
+      - dbt/models/marts/dim_customers.sql
+      - docs/grain.md
+
+  - name: repeat_customers
+    claim: 2997
+    sql: select count(*) from main_marts.dim_customers where order_count > 1
+    cited_in:
+      - dbt/models/marts/dim_customers.sql
+      - docs/grain.md
+
+  - name: customers_who_moved
+    claim: 250
+    sql: >
+      select count(*) from (
+        select customer_unique_id from main_staging.stg_customers
+        group by 1 having count(distinct customer_zip_prefix) > 1)
+    cited_in:
+      - dbt/models/marts/dim_customers.sql
+      - docs/grain.md
+
+  - name: orders_total
+    claim: 99441
+    sql: select count(*) from main_marts.fct_orders
+    cited_in:
+      - docs/grain.md
+
+  - name: orders_without_items
+    claim: 775
+    sql: select count(*) from main_marts.fct_orders where has_no_items
+    cited_in:
+      - dbt/models/staging/stg_order_items.sql
+      - dbt/models/marts/fct_orders.sql
+      - docs/grain.md
+
+  - name: orders_without_delivery_timestamp
+    claim: 2965
+    sql: >
+      select count(*) from main_marts.fct_orders
+      where delivered_to_customer_at is null
+    cited_in:
+      - dbt/models/marts/fct_orders.sql
+      - docs/grain.md
+
+  - name: order_lines
+    claim: 112650
+    sql: select count(*) from main_marts.fct_order_items
+    cited_in:
+      - docs/grain.md
+
+  - name: products_total
+    claim: 32951
+    sql: select count(*) from main_marts.dim_products
+    cited_in:
+      - docs/grain.md
+
+  - name: products_without_category
+    claim: 610
+    sql: >
+      select count(*) from main_marts.dim_products
+      where category_status = 'no category in source'
+    cited_in:
+      - dbt/models/staging/stg_products.sql
+      - dbt/models/marts/dim_products.sql
+      - docs/grain.md
+
+  - name: products_without_translation
+    claim: 13
+    sql: >
+      select count(*) from main_marts.dim_products
+      where category_status = 'no english translation'
+    cited_in:
+      - dbt/models/marts/dim_products.sql
+      - docs/grain.md
+
+  - name: sellers_total
+    claim: 3095
+    sql: select count(*) from main_marts.dim_sellers
+    cited_in:
+      - dbt/models/marts/dim_sellers.sql
+      - docs/grain.md
+
+  - name: reviews_rows
+    claim: 99224
+    sql: select count(*) from main_staging.stg_reviews
+    cited_in:
+      - dbt/models/staging/stg_reviews.sql
+
+  - name: duplicated_review_ids
+    claim: 789
+    sql: >
+      select count(*) from (
+        select review_id from main_staging.stg_reviews
+        group by 1 having count(*) > 1)
+    cited_in:
+      - dbt/models/staging/stg_reviews.sql
